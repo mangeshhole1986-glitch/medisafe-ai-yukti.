@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEDISAFE AI — Medication Safety Demo</title>
+<style>
+:root{--green:#15966b;--dark:#0b1720;--bg:#f4f8f7;--red:#d9363e;--amber:#e59619;--muted:#64748b;--card:#fff}
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;background:var(--bg);color:#12202a}
+.app{max-width:430px;margin:auto;min-height:100vh;background:#f7faf9}
+header{background:#0b1720;color:white;padding:22px 20px 18px;border-radius:0 0 24px 24px}
+.brand{font-size:25px;font-weight:800;letter-spacing:.3px}.brand span{color:#54d6a7}.tag{font-size:12px;color:#b9c7cf;margin-top:4px}
+main{padding:16px}.card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 4px 18px #17352b10}
+h2{font-size:18px;margin:0 0 10px}.small{font-size:12px;color:var(--muted)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{border:0;border-radius:13px;padding:13px;font-weight:700;cursor:pointer}.primary{background:var(--green);color:#fff}.secondary{background:#e9f5f1;color:#087452}.outline{background:white;border:1px solid #cddbd6;color:#1d4b3d}
+input[type=file]{display:none}
+.camera{background:#071118;border-radius:18px;overflow:hidden;color:white;text-align:center}.preview{width:100%;height:250px;object-fit:cover;background:#101b22;display:block}.cameraText{padding:10px;font-size:12px}
+.med{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #edf1ef}.pill{width:42px;height:42px;border-radius:12px;background:#e7f7f1;display:grid;place-items:center;font-size:21px}.med:last-child{border-bottom:0}
+.badge{padding:5px 8px;border-radius:20px;font-size:11px;font-weight:800}.green{background:#def7eb;color:#087452}.red{background:#ffe5e7;color:#b4232b}.amber{background:#fff0d5;color:#9a5a00}
+.score{font-size:46px;font-weight:850;text-align:center;color:#b36a00}.meter{height:12px;background:#e5ebe8;border-radius:20px;overflow:hidden}.fill{height:100%;background:linear-gradient(90deg,#1ca56f,#f0b52e,#d9363e);width:64%}
+.alert{border-left:5px solid var(--red);background:#fff5f5;padding:12px;border-radius:12px;margin:10px 0}.warning{border-left-color:var(--amber);background:#fffaf0}.success{border-left-color:var(--green);background:#f1fbf7}
+.row{display:flex;justify-content:space-between;gap:12px}.hidden{display:none}.nav{position:sticky;bottom:0;background:#fff;border-top:1px solid #e3ebe8;padding:10px;display:flex;justify-content:space-around;font-size:11px}.nav button{border:0;background:none;color:#60716a;font-weight:700}
+select{width:100%;padding:12px;border:1px solid #cfdad6;border-radius:12px;background:white;margin:6px 0 10px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:70px;background:#0b1720;color:#fff;padding:12px 16px;border-radius:12px;font-size:12px;display:none}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand">🛡️ MEDI<span>SAFE AI</span></div>
+  <div class="tag">AI-assisted medication reconciliation & error prevention</div>
+</header>
+
+<main>
+<section id="home">
+  <div class="card">
+    <div class="row"><div><h2>Good afternoon 👋</h2><div class="small">Let's make your medicines safer.</div></div><div>🔔</div></div>
+  </div>
+  <div class="card">
+    <h2>Quick Actions</h2>
+    <div class="actions">
+      <button class="btn primary" onclick="showScan()">📷 Scan Medicine</button>
+      <button class="btn secondary" onclick="showPrescription()">📄 Scan Prescription</button>
+      <button class="btn outline" onclick="showMeds()">💊 My Medicines</button>
+      <button class="btn outline" onclick="runAnalysis()">🧠 Safety Analysis</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Medication Safety Summary</h2>
+    <div class="row"><span>Safety score</span><strong id="homeScore">64/100</strong></div>
+    <div class="meter"><div class="fill" id="homeFill"></div></div>
+    <p class="small">Prototype risk indicator — professional verification required for clinical decisions.</p>
+  </div>
+</section>
+
+<section id="scan" class="hidden">
+  <div class="card">
+    <h2>Scan Medicine</h2>
+    <div class="camera">
+      <video id="video" class="preview" autoplay playsinline></video>
+      <img id="photo" class="preview hidden">
+      <div class="cameraText" id="cameraText">Allow camera access, or upload a medicine-strip photo.</div>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn primary" onclick="startCamera()">Start Camera</button>
+      <button class="btn secondary" onclick="capture()">Capture</button>
+    </div>
+    <label class="btn outline" style="display:block;text-align:center;margin-top:10px">
+      Upload Medicine Photo
+      <input id="file" type="file" accept="image/*" capture="environment" onchange="previewFile(event)">
+    </label>
+  </div>
+  <div class="card">
+    <h2>Prototype AI Recognition</h2>
+    <div class="small">For the competition demo, select the medicine visible in your sample image. In a production version this field would be populated by OCR/computer vision + a verified medicine database.</div>
+    <select id="medicineSelect">
+      <option value="">Select detected medicine…</option>
+      <option value="dolo">Dolo 650 — Paracetamol 650 mg</option>
+      <option value="crocin">Crocin 650 — Paracetamol 650 mg</option>
+      <option value="amox">Amoxicillin 500 mg</option>
+      <option value="pant">Pantoprazole 40 mg</option>
+      <option value="cet">Cetirizine 10 mg</option>
+      <option value="cold">OTC Cold Tablet — contains Paracetamol (demo)</option>
+    </select>
+    <button class="btn primary" style="width:100%" onclick="identifyMedicine()">Identify & Add</button>
+  </div>
+</section>
+
+<section id="meds" class="hidden">
+  <div class="card">
+    <div class="row"><h2>My Medicines</h2><button class="btn secondary" onclick="showScan()">+ Add</button></div>
+    <div id="medList"></div>
+  </div>
+</section>
+
+<section id="analysis" class="hidden">
+  <div class="card">
+    <h2>Medication Safety Analysis</h2>
+    <div class="score" id="score">64<span style="font-size:16px">/100</span></div>
+    <div style="text-align:center"><span class="badge amber" id="riskLabel">MODERATE RISK</span></div>
+    <div class="meter" style="margin-top:14px"><div class="fill" id="fill"></div></div>
+  </div>
+  <div id="alerts"></div>
+  <div class="card">
+    <h2>Clinical safety boundary</h2>
+    <p class="small">MEDISAFE AI is a decision-support prototype. It does not diagnose, prescribe, or instruct a patient to stop/change medication. Potential findings should be reviewed by a qualified pharmacist/doctor.</p>
+  </div>
+</section>
+
+<section id="prescription" class="hidden">
+  <div class="card">
+    <h2>Prescription Reconciliation</h2>
+    <p class="small">Demo prescription:</p>
+    <div class="med"><div class="pill">💊</div><div><b>Amoxicillin</b><br><span class="small">500 mg · 1-0-1 · 5 days</span></div></div>
+    <div class="med"><div class="pill">💊</div><div><b>Pantoprazole</b><br><span class="small">40 mg · 1-0-0 · 10 days</span></div></div>
+    <div class="med"><div class="pill">💊</div><div><b>Paracetamol</b><br><span class="small">650 mg · SOS</span></div></div>
+    <button class="btn primary" style="width:100%;margin-top:12px" onclick="reconcile()">Compare With My Medicines</button>
+  </div>
+  <div id="reconResult"></div>
+</section>
+</main>
+
+<div class="nav">
+<button onclick="show('home')">⌂ Home</button>
+<button onclick="showScan()">⌁ Scan</button>
+<button onclick="showMeds()">◉ Medicines</button>
+<button onclick="runAnalysis()">◈ Safety</button>
+<button onclick="showPrescription()">▤ Report</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DB={
+dolo:{brand:"Dolo 650",generic:"Paracetamol",ingredient:"Paracetamol",strength:"650 mg",form:"Tablet"},
+crocin:{brand:"Crocin 650",generic:"Paracetamol",ingredient:"Paracetamol",strength:"650 mg",form:"Tablet"},
+amox:{brand:"Amoxicillin",generic:"Amoxicillin",ingredient:"Amoxicillin",strength:"500 mg",form:"Capsule"},
+pant:{brand:"Pantoprazole",generic:"Pantoprazole",ingredient:"Pantoprazole",strength:"40 mg",form:"Tablet"},
+cet:{brand:"Cetirizine",generic:"Cetirizine",ingredient:"Cetirizine",strength:"10 mg",form:"Tablet"},
+cold:{brand:"OTC Cold Tablet (Demo)",generic:"Combination",ingredient:"Paracetamol",strength:"650 mg equivalent",form:"Tablet"}
+};
+let meds=[]; let stream=null;
+
+function show(id){
+ document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
+ document.getElementById(id).classList.remove('hidden');
+ if(id==='meds') renderMeds();
+ if(id==='analysis') renderAnalysis();
+}
+function showScan(){show('scan')}
+function showMeds(){show('meds')}
+function showPrescription(){show('prescription')}
+function toast(t){let x=document.getElementById('toast');x.textContent=t;x.style.display='block';setTimeout(()=>x.style.display='none',2200)}
+async function startCamera(){
+ try{
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+  document.getElementById('video').srcObject=stream;
+  toast("Camera ready");
+ }catch(e){toast("Camera unavailable — use photo upload.")}
+}
+function capture(){
+ const v=document.getElementById('video');
+ if(!v.srcObject){toast("Start camera first");return}
+ const c=document.createElement('canvas'); c.width=v.videoWidth||800;c.height=v.videoHeight||600;c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+ const img=document.getElementById('photo');img.src=c.toDataURL('image/jpeg');img.classList.remove('hidden');v.classList.add('hidden');
+ document.getElementById('cameraText').textContent="Image captured. Select the medicine for the prototype recognition step.";
+}
+function previewFile(e){
+ const f=e.target.files[0];if(!f)return;
+ const r=new FileReader();r.onload=()=>{const img=document.getElementById('photo');img.src=r.result;img.classList.remove('hidden');document.getElementById('video').classList.add('hidden');document.getElementById('cameraText').textContent="Photo loaded. Select the medicine for prototype recognition.";};r.readAsDataURL(f);
+}
+function identifyMedicine(){
+ const key=document.getElementById('medicineSelect').value;
+ if(!key){toast("Select the medicine visible in the demo image");return}
+ const m=DB[key]; meds.push({...m,key,source:"Scanned"});
+ toast(m.brand+" identified and added");
+ renderMeds(); show('analysis'); renderAnalysis();
+}
+function renderMeds(){
+ const box=document.getElementById('medList');
+ if(!meds.length){box.innerHTML='<p class="small">No medicines added yet. Use Scan Medicine to begin.</p>';return}
+ box.innerHTML=meds.map((m,i)=>`<div class="med"><div class="pill">💊</div><div style="flex:1"><b>${m.brand}</b><br><span class="small">${m.ingredient} · ${m.strength} · ${m.form}</span></div><span class="badge green">SCANNED</span></div>`).join('');
+}
+function analyze(){
+ let alerts=[];
+ const groups={};
+ meds.forEach(m=>(groups[m.ingredient]??=[]).push(m));
+ Object.entries(groups).forEach(([ing,arr])=>{if(arr.length>1)alerts.push({type:"critical",title:"Duplicate active ingredient",body:`${ing} detected in ${arr.length} medicines: ${arr.map(x=>x.brand).join(" + ")}.`})});
+ if(meds.some(m=>m.key==='amox') && meds.some(m=>m.key==='pant')) alerts.push({type:"moderate",title:"Demo interaction rule",body:"This prototype flags the selected combination for pharmacist review. Replace demo rules with a verified clinical interaction database before deployment."});
+ if(meds.some(m=>m.key==='cold') && meds.some(m=>m.ingredient==='Paracetamol' && m.key!=='cold')) alerts.push({type:"critical",title:"Duplicate ingredient risk",body:"The demo cold product contains paracetamol and another paracetamol product is already in the list."});
+ return alerts;
+}
+function renderAnalysis(){
+ const alerts=analyze(); let score=100-alerts.reduce((s,a)=>s+(a.type==='critical'?24:12),0);score=Math.max(0,score);
+ document.getElementById('score').innerHTML=score+'<span style="font-size:16px">/100</span>';
+ document.getElementById('fill').style.width=score+'%'; document.getElementById('homeScore').textContent=score+'/100';document.getElementById('homeFill').style.width=score+'%';
+ document.getElementById('riskLabel').textContent=score<50?'HIGH RISK':score<75?'MODERATE RISK':'LOWER RISK';
+ const box=document.getElementById('alerts');
+ box.innerHTML=alerts.length?alerts.map(a=>`<div class="card alert ${a.type==='moderate'?'warning':''}"><b>${a.type==='critical'?'🚨':'⚠️'} ${a.title}</b><p class="small">${a.body}</p><button class="btn outline" onclick="toast('Flag marked for pharmacist review')">Flag for Review</button></div>`).join(''):'<div class="card success"><b>🟢 No prototype alerts detected</b><p class="small">Continue normal professional medication review.</p></div>';
+}
+function runAnalysis(){show('analysis');renderAnalysis()}
+function reconcile(){
+ const prescribed=['Amoxicillin','Pantoprazole','Paracetamol'];
+ const actual=meds.map(m=>m.generic);
+ const missing=prescribed.filter(x=>!actual.includes(x));
+ const extra=actual.filter(x=>!prescribed.includes(x));
+ document.getElementById('reconResult').innerHTML=`<div class="card ${missing.length||extra.length?'alert':'success'}"><h2>${missing.length||extra.length?'⚠️ Discrepancy Found':'✅ Reconciliation Complete'}</h2><p class="small"><b>Prescribed:</b> ${prescribed.join(', ')}</p><p class="small"><b>Current list:</b> ${actual.length?actual.join(', '):'No medicines added'}</p>${missing.length?`<p class="small"><b>Not found:</b> ${missing.join(', ')}</p>`:''}${extra.length?`<p class="small"><b>Not on demo prescription:</b> ${extra.join(', ')}</p>`:''}<button class="btn primary" style="width:100%" onclick="toast('Report prepared for pharmacist review')">Share With Pharmacist</button></div>`;
+}
+show('home');
+</script>
+</body>
+</html>
